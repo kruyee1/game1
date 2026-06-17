@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>เกมคณิตศาสตร์ AR จับผลไม้แสนสนุก ป.3</title>
+  <!-- Tailwind CSS for modern responsive UI -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts for Cute Thai Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chitti:wght@400;700&family=Mitr:wght@300;400;600&family=Prompt:wght@400;600;800&display=swap" rel="stylesheet">
+  
+  <!-- MediaPipe Hands & Camera Utils CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <style>
+    body {
+      font-family: 'Mitr', 'Prompt', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      overflow: hidden;
+    }
+    .fancy-title {
+      font-family: 'Chitti', 'Prompt', sans-serif;
+    }
+    /* Mirror the video preview for natural user interaction */
+    #webcam-video {
+      transform: scaleX(-1);
+    }
+    /* Loading spinner animation */
+    .loader {
+      border-top-color: #3490dc;
+      animation: spinner 1.5s linear infinite;
+    }
+    @keyframes spinner {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 min-h-screen text-slate-800 flex flex-col items-center justify-between p-4 overflow-hidden relative">
+
+  <!-- Splash / Start Screen -->
+  <div id="start-screen" class="fixed inset-0 bg-white/95 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto my-auto rounded-3xl shadow-2xl border-4 border-purple-300 h-[90vh]">
+    <div class="text-6xl mb-4 animate-bounce">🍎🍌🍇</div>
+    <h1 class="text-3xl md:text-4xl font-extrabold text-indigo-600 mb-2 fancy-title leading-snug">
+      AR จับผลไม้คณิตศาสตร์
+    </h1>
+    <p class="text-sm text-purple-500 font-semibold mb-6">ระดับชั้นประถมศึกษาปีที่ 3 (ผลลัพธ์ไม่เกิน 1,000)</p>
+    
+    <!-- Instructions Card -->
+    <div class="bg-purple-50 p-4 rounded-2xl border-2 border-purple-200 text-left mb-6 w-full text-sm space-y-3">
+      <h3 class="font-bold text-indigo-700 text-base mb-1 flex items-center">
+        💡 วิธีการเล่นแสนง่าย:
+      </h3>
+      <p class="flex items-start">
+        <span class="bg-indigo-200 text-indigo-700 rounded-full w-5 h-5 flex items-center justify-center font-bold text-xs mr-2 mt-0.5 shrink-0">1</span>
+        <span>อนุญาตสิทธิ์เข้าใช้งานกล้องเว็บแคมเพื่อเริ่มการตรวจจับมือ (AR)</span>
+      </p>
+      <p class="flex items-start">
+        <span class="bg-indigo-200 text-indigo-700 rounded-full w-5 h-5 flex items-center justify-center font-bold text-xs mr-2 mt-0.5 shrink-0">2</span>
+        <span>ยื่นมือมาหน้ากล้อง ใช้ <b>ปลายนิ้วชี้ 👉</b> แตะผลไม้ที่มีคำตอบที่ถูกต้อง</span>
+      </p>
+      <p class="flex items-start">
+        <span class="bg-indigo-200 text-indigo-700 rounded-full w-5 h-5 flex items-center justify-center font-bold text-xs mr-2 mt-0.5 shrink-0">3</span>
+        <span class="text-pink-600 font-medium">ไม่มีกล้อง? สามารถใช้เมาส์คลิกหรือใช้นิ้วจิ้มหน้าจอเล่นปกติได้เลย!</span>
+      </p>
+    </div>
+
+    <!-- Select Game Mode -->
+    <div class="w-full mb-6">
+      <label class="block text-sm font-bold text-indigo-700 mb-2">เลือกโหมดทักษะคณิตศาสตร์:</label>
+      <div class="grid grid-cols-3 gap-2">
+        <button id="mode-add" onclick="selectMode('addition')" class="py-2.5 px-2 bg-pink-500 text-white rounded-xl font-semibold text-xs border-2 border-transparent shadow hover:bg-pink-600 transition duration-200 focus:outline-none">
+          ➕ การบวก
+        </button>
+        <button id="mode-sub" onclick="selectMode('subtraction')" class="py-2.5 px-2 bg-indigo-500 text-white rounded-xl font-semibold text-xs border-2 border-transparent shadow hover:bg-indigo-600 transition duration-200 focus:outline-none">
+          ➖ การลบ
+        </button>
+        <button id="mode-mix" onclick="selectMode('mixed')" class="py-2.5 px-2 bg-purple-600 text-white rounded-xl font-semibold text-xs border-2 border-yellow-300 shadow hover:bg-purple-700 transition duration-200 focus:outline-none ring-4 ring-purple-200">
+          🔀 ผสมทั้งหมด
+        </button>
+      </div>
+    </div>
+
+    <!-- Start Buttons -->
+    <div class="w-full space-y-3">
+      <button onclick="startGame(true)" class="w-full py-4 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-500 hover:to-green-600 text-white font-bold text-lg rounded-2xl shadow-lg transform active:scale-95 transition-all duration-150 flex items-center justify-center gap-2">
+        📷 เล่นด้วยระบบ AR (เปิดกล้อง)
+      </button>
+      <button onclick="startGame(false)" class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm rounded-xl border border-slate-300 transition duration-150 flex items-center justify-center gap-2">
+        🖱️ เล่นแบบปกติ (ใช้เมาส์/สัมผัสจอ)
+      </button>
+    </div>
+
+    <!-- Loading State inside Splash Screen -->
+    <div id="loading-overlay" class="hidden absolute inset-0 bg-white/95 rounded-3xl flex flex-col items-center justify-center p-6">
+      <div class="loader ease-linear rounded-full border-4 border-t-4 border-slate-200 h-16 w-16 mb-4"></div>
+      <h3 class="text-lg font-bold text-indigo-700 mb-2">กำลังโหลดระบบปัญญาประดิษฐ์ AR...</h3>
+      <p class="text-xs text-slate-500">กรุณารอและอนุญาตการเข้าถึงกล้องของคุณสักครู่</p>
+    </div>
+  </div>
+
+  <!-- End / Game Over Screen -->
+  <div id="game-over-screen" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-3xl text-center max-w-sm w-full border-4 border-pink-400 shadow-2xl transform scale-100 transition-all duration-300">
+      <div class="text-6xl mb-4 animate-bounce">🏆</div>
+      <h2 class="text-3xl font-extrabold text-pink-600 mb-1 fancy-title">จบเกมแล้วจ้า!</h2>
+      <p class="text-sm text-slate-500 mb-6">เก่งมากเลยคนเก่ง ได้รับความรู้คณิตศาสตร์เต็มเปี่ยม!</p>
+      
+      <div class="bg-pink-50 p-4 rounded-2xl mb-6 space-y-2 border border-pink-100">
+        <div class="flex justify-between items-center text-slate-600">
+          <span>คะแนนที่ได้:</span>
+          <span id="final-score" class="font-bold text-2xl text-pink-600">0</span>
+        </div>
+        <div class="flex justify-between items-center text-slate-600">
+          <span>ตอบถูกทั้งหมด:</span>
+          <span id="final-correct" class="font-bold text-lg text-emerald-600">0 ข้อ</span>
+        </div>
+        <div class="flex justify-between items-center text-slate-600 border-t pt-2 mt-2">
+          <span>คะแนนสูงสุด (High Score):</span>
+          <span id="high-score-display" class="font-bold text-lg text-amber-500">0</span>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <button onclick="restartGame()" class="w-full py-3.5 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-bold rounded-2xl shadow-lg transform active:scale-95 transition-all">
+          🔄 เล่นใหม่อีกครั้ง
+        </button>
+        <button onclick="showStartScreen()" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold text-sm rounded-xl transition">
+          🏠 กลับหน้าหลัก
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Message Prompt (Toast style notifications) -->
+  <div id="toast" class="opacity-0 fixed top-24 left-1/2 transform -translate-x-1/2 z-40 transition-all duration-300 bg-emerald-500 text-white px-6 py-2.5 rounded-full shadow-lg font-bold flex items-center gap-2 pointer-events-none">
+    <span id="toast-icon">✨</span> <span id="toast-text">ตอบถูกแล้วจ้า!</span>
+  </div>
+
+  <!-- MAIN INTERFACE -->
+  
+  <!-- Header Control Bar -->
+  <header class="w-full max-w-4xl flex items-center justify-between bg-white/80 backdrop-blur-md px-4 py-3 rounded-2xl shadow-md border border-white/20 z-10 shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="bg-gradient-to-r from-pink-500 to-indigo-600 text-white px-4 py-1.5 rounded-xl font-bold text-xs md:text-sm shadow">
+        🍉 คะแนน: <span id="score" class="text-base font-extrabold ml-1">0</span>
+      </div>
+      <div class="flex gap-1 text-base md:text-lg" id="lives-container">
+        ❤️ ❤️ ❤️
+      </div>
+    </div>
+    
+    <div class="text-xs font-semibold text-slate-500 flex items-center gap-2">
+      <span id="ar-status-dot" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+      <span id="ar-status-text">โหมดสัมผัสหน้าจอ</span>
+    </div>
+
+    <button onclick="exitToMainMenu()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg border border-slate-200 font-medium transition">
+      🏠 เมนูหลัก
+    </button>
+  </header>
+
+  <!-- Math Question Board -->
+  <section class="w-full max-w-lg bg-gradient-to-b from-yellow-100 to-amber-200 p-4 rounded-3xl shadow-xl border-4 border-amber-300 text-center relative z-10 shrink-0 my-3">
+    <p class="text-xs font-bold text-amber-700 uppercase tracking-wider mb-1">💡 คำนวณคำตอบให้ถูกต้อง!</p>
+    <div class="text-3xl md:text-4xl font-extrabold text-amber-900 tracking-tight" id="math-question">
+      150 + 230 = ?
+    </div>
+    <!-- Level / Progress Timer bar -->
+    <div class="w-full bg-amber-300/50 h-2 rounded-full mt-3 overflow-hidden">
+      <div id="progress-timer" class="bg-gradient-to-r from-amber-500 to-red-500 h-full w-full transition-all duration-100 ease-linear"></div>
+    </div>
+  </section>
+
+  <!-- Interactive Game Screen Canvas + Video Container -->
+  <main class="w-full max-w-4xl flex-grow relative rounded-3xl shadow-2xl border-4 border-white/90 overflow-hidden bg-slate-900 min-h-[350px] md:min-h-[500px]">
+    <!-- Invisible Video for MediaPipe processing -->
+    <video id="webcam-video" autoplay playsinline muted class="hidden absolute inset-0 w-full h-full object-cover"></video>
+    
+    <!-- AR Interaction Overlay Canvas -->
+    <canvas id="game-canvas" class="absolute inset-0 w-full h-full object-cover z-20 cursor-crosshair"></canvas>
+
+    <!-- Calibration / Hand Detection Guide Indicator overlay -->
+    <div id="detection-indicator" class="absolute bottom-4 left-4 z-30 bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
+      <span class="animate-pulse text-amber-400">👋</span> 
+      <span id="tracking-status-label">กำลังรอตรวจจับมือนิ้วชี้...</span>
+    </div>
+
+    <!-- Mouse/Touch Helper Banner (shown when Camera is Off) -->
+    <div id="mouse-control-hint" class="absolute top-4 left-4 right-4 z-30 bg-indigo-900/80 backdrop-blur-sm text-indigo-100 p-2.5 rounded-xl text-center text-xs border border-indigo-500/30">
+      💡 <b>ระบบสัมผัสทำงานอยู่:</b> สามารถใช้นิ้วแตะหรือใช้เมาส์คลิกเพื่อตอบคำถามได้โดยตรง!
+    </div>
+  </main>
+
+  <!-- Footer Info -->
+  <footer class="w-full max-w-4xl text-center text-[10px] md:text-xs text-slate-500 py-2 shrink-0 z-10">
+    <p>เกม AR จับผลไม้คณิตศาสตร์ ป.3 พัฒนาด้วยเทคโนโลยี AI Hand Tracking & Web Audio 🍎🍇</p>
+  </footer>
+
+  <!-- Application Logic Code -->
+  <script>
+    // --- Application State ---
+    let gameState = {
+      score: 0,
+      lives: 3,
+      currentQuestion: { num1: 0, num2: 0, op: '+', answer: 0 },
+      options: [], // [{ text: '120', value: 120, x: 100, y: 100, emoji: '🍎', size: 45, speed: 2 }]
+      gameMode: 'mixed', // addition, subtraction, mixed
+      useAR: false,
+      isLoaded: false,
+      active: false,
+      timeLeft: 100, // percentage of time remaining for question
+      questionInterval: null,
+      highScore: parseInt(localStorage.getItem('math_ar_highscore') || '0', 10),
+      correctAnswersCount: 0
+    };
+
+    // UI elements
+    const startScreen = document.getElementById('start-screen');
+    const gameOverScreen = document.getElementById('game-over-screen');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const videoElement = document.getElementById('webcam-video');
+    const canvasElement = document.getElementById('game-canvas');
+    const ctx = canvasElement.getContext('2d');
+    const scoreText = document.getElementById('score');
+    const livesContainer = document.getElementById('lives-container');
+    const mathQuestionText = document.getElementById('math-question');
+    const progressTimer = document.getElementById('progress-timer');
+    const toast = document.getElementById('toast');
+    const toastText = document.getElementById('toast-text');
+    const toastIcon = document.getElementById('toast-icon');
+    const trackingStatusLabel = document.getElementById('tracking-status-label');
+    const arStatusDot = document.getElementById('ar-status-dot');
+    const arStatusText = document.getElementById('ar-status-text');
+    const mouseControlHint = document.getElementById('mouse-control-hint');
+
+    // Canvas settings
+    let canvasWidth = 800;
+    let canvasHeight = 600;
+    
+    // Fruit settings
+    const fruitEmojis = ['🍎', '🍌', '🍊', '🍇', '🍉', '🍍', '🍒', '🍓', '🍋', '🥝'];
+    let fruits = [];
+    const maxFruits = 4;
+    let indexFingerPos = { x: null, y: null }; // Mirrored to match video mapping
+    let handDetected = false;
+    let soundCtx = null;
+
+    // Initialize Web Audio Context for synthesized sound effects
+    function initAudio() {
+      if (!soundCtx) {
+        soundCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    // Play procedural synth sounds
+    function playSound(type) {
+      if (!soundCtx) return;
+      try {
+        const osc = soundCtx.createOscillator();
+        const gain = soundCtx.createGain();
+        osc.connect(gain);
+        gain.connect(soundCtx.destination);
+
+        const now = soundCtx.currentTime;
+
+        if (type === 'correct') {
+          // Double note ding
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(523.25, now); // C5
+          osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        } else if (type === 'incorrect') {
+          // Buzzer sound
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(150, now);
+          osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        } else if (type === 'gameover') {
+          // Sad descending melody
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(300, now);
+          osc.frequency.setValueAtTime(250, now + 0.15);
+          osc.frequency.setValueAtTime(200, now + 0.3);
+          osc.frequency.setValueAtTime(150, now + 0.45);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+          osc.start(now);
+          osc.stop(now + 0.6);
+        }
+      } catch (err) {
+        console.error("Audio error:", err);
+      }
+    }
+
+    // Configure selection mode buttons
+    function selectMode(mode) {
+      gameState.gameMode = mode;
+      
+      // Update Button visual states
+      document.getElementById('mode-add').className = "py-2.5 px-2 bg-slate-200 text-slate-700 rounded-xl font-semibold text-xs transition duration-200 focus:outline-none";
+      document.getElementById('mode-sub').className = "py-2.5 px-2 bg-slate-200 text-slate-700 rounded-xl font-semibold text-xs transition duration-200 focus:outline-none";
+      document.getElementById('mode-mix').className = "py-2.5 px-2 bg-slate-200 text-slate-700 rounded-xl font-semibold text-xs transition duration-200 focus:outline-none";
+
+      if (mode === 'addition') {
+        document.getElementById('mode-add').className = "py-2.5 px-2 bg-pink-500 text-white rounded-xl font-semibold text-xs border-2 border-pink-300 shadow hover:bg-pink-600 transition duration-200 ring-4 ring-pink-200 focus:outline-none";
+      } else if (mode === 'subtraction') {
+        document.getElementById('mode-sub').className = "py-2.5 px-2 bg-indigo-500 text-white rounded-xl font-semibold text-xs border-2 border-indigo-300 shadow hover:bg-indigo-600 transition duration-200 ring-4 ring-indigo-200 focus:outline-none";
+      } else {
+        document.getElementById('mode-mix').className = "py-2.5 px-2 bg-purple-600 text-white rounded-xl font-semibold text-xs border-2 border-purple-300 shadow hover:bg-purple-700 transition duration-200 ring-4 ring-purple-200 focus:outline-none";
+      }
+    }
+
+    // Display messages on feedback
+    function showToast(message, isSuccess = true) {
+      toastText.textContent = message;
+      toastIcon.textContent = isSuccess ? '✅' : '❌';
+      
+      if (isSuccess) {
+        toast.className = "opacity-100 fixed top-24 left-1/2 transform -translate-x-1/2 z-40 transition-all duration-300 bg-emerald-500 text-white px-6 py-2.5 rounded-full shadow-lg font-bold flex items-center gap-2 pointer-events-none scale-105";
+      } else {
+        toast.className = "opacity-100 fixed top-24 left-1/2 transform -translate-x-1/2 z-40 transition-all duration-300 bg-rose-500 text-white px-6 py-2.5 rounded-full shadow-lg font-bold flex items-center gap-2 pointer-events-none scale-105";
+      }
+
+      setTimeout(() => {
+        toast.className = "opacity-0 fixed top-24 left-1/2 transform -translate-x-1/2 z-40 transition-all duration-300 bg-emerald-500 text-white px-6 py-2.5 rounded-full shadow-lg font-bold flex items-center gap-2 pointer-events-none scale-100";
+      }, 1200);
+    }
+
+    // Generate Grade 3 Math Question (Numbers up to 1000)
+    function generateQuestion() {
+      let num1, num2, op, answer;
+      let currentOp = gameState.gameMode;
+      
+      if (currentOp === 'mixed') {
+        currentOp = Math.random() > 0.5 ? 'addition' : 'subtraction';
+      }
+
+      if (currentOp === 'addition') {
+        op = '+';
+        // Ensure result does not exceed 1000
+        answer = Math.floor(Math.random() * 800) + 150; // Final answer 150 - 950
+        num1 = Math.floor(Math.random() * (answer - 50)) + 25; // Random num1 < answer
+        num2 = answer - num1;
+      } else {
+        op = '-';
+        // Ensure inputs do not exceed 1000, answer is positive
+        num1 = Math.floor(Math.random() * 750) + 200; // Original 200 - 950
+        num2 = Math.floor(Math.random() * (num1 - 50)) + 25; // Ensure subtracted is smaller
+        answer = num1 - num2;
+      }
+
+      gameState.currentQuestion = { num1, num2, op, answer };
+      mathQuestionText.textContent = `${num1} ${op} ${num2} = ?`;
+      
+      // Reset timer bar
+      gameState.timeLeft = 100;
+      progressTimer.style.width = '100%';
+      progressTimer.className = "bg-gradient-to-r from-emerald-500 to-green-500 h-full w-full";
+
+      // Spawn Fruits containing the answers
+      spawnQuestionFruits(answer);
+    }
+
+    // Spawn 4 fruits containing 1 correct answer and 3 tricky wrong answers
+    function spawnQuestionFruits(correctAnswer) {
+      fruits = [];
+
+      // Generate wrong answers that look realistic for Grade 3 (close digits, off by 10, or 100)
+      let incorrectAnswers = new Set();
+      while (incorrectAnswers.size < 3) {
+        let variance = Math.random() > 0.5 ? 10 : 100;
+        let direction = Math.random() > 0.5 ? 1 : -1;
+        let candidate = correctAnswer + (direction * variance);
+        
+        // Ensure wrong answers are logically sound and within standard range
+        if (candidate === correctAnswer || candidate <= 0 || candidate > 1000) {
+          candidate = correctAnswer + Math.floor(Math.random() * 80) - 40;
+        }
+        
+        if (candidate > 0 && candidate <= 1000 && candidate !== correctAnswer) {
+          incorrectAnswers.add(candidate);
+        }
+      }
+
+      // Merge answers and shuffle
+      let answersPool = [correctAnswer, ...Array.from(incorrectAnswers)];
+      answersPool = answersPool.sort(() => Math.random() - 0.5);
+
+      // Create Fruit objects
+      const segmentWidth = canvasWidth / answersPool.length;
+      for (let i = 0; i < answersPool.length; i++) {
+        const xPos = segmentWidth * i + (segmentWidth / 2) + (Math.random() * 40 - 20);
+        // Stagger spawn heights slightly so they don't fall as a straight line
+        const yPos = -60 - (Math.random() * 120); 
+        const emoji = fruitEmojis[Math.floor(Math.random() * fruitEmojis.length)];
+        
+        fruits.push({
+          value: answersPool[i],
+          isCorrect: answersPool[i] === correctAnswer,
+          x: xPos,
+          y: yPos,
+          emoji: emoji,
+          size: 48,
+          speed: 1.3 + (Math.random() * 0.8) + (gameState.score * 0.05), // speed scaling with score
+          radius: 36, // collision boundary radius
+          hoverDuration: 0, // for tracking hold progress (AR)
+          popped: false
+        });
+      }
+    }
+
+    // Check collision between index finger coordinate / mouse click and fruits
+    function checkCollision(touchX, touchY, isInteraction = false) {
+      if (!gameState.active) return;
+
+      for (let i = 0; i < fruits.length; i++) {
+        const fruit = fruits[i];
+        if (fruit.popped) continue;
+
+        const distance = Math.hypot(fruit.x - touchX, fruit.y - touchY);
+
+        // Interaction criteria (Index finger hovering or explicit touch click)
+        if (distance < fruit.radius + 20) {
+          if (isInteraction) {
+            triggerFruitAnswer(fruit);
+            break;
+          } else {
+            // For AR hand tracking hover duration to avoid instant wrong triggers
+            fruit.hoverDuration += 4; // increment hover state
+            if (fruit.hoverDuration >= 35) { // Hovered long enough to trigger (approx ~250ms)
+              triggerFruitAnswer(fruit);
+              break;
+            }
+          }
+        } else {
+          // Slowly decay hover progression if the user pulls finger away
+          fruit.hoverDuration = Math.max(0, fruit.hoverDuration - 2);
+        }
+      }
+    }
+
+    // Trigger action when user catches a fruit
+    function triggerFruitAnswer(fruit) {
+      fruit.popped = true;
+      
+      if (fruit.isCorrect) {
+        // Success
+        playSound('correct');
+        gameState.score += 100;
+        gameState.correctAnswersCount++;
+        scoreText.textContent = gameState.score;
+        showToast("เก่งมาก! คำตอบถูกต้อง 🎉", true);
+        
+        // Spawn success splash particles inside drawing canvas
+        createParticles(fruit.x, fruit.y, '#10b981');
+
+        // Delay slightly before spawning next question
+        setTimeout(generateQuestion, 800);
+      } else {
+        // Incorrect
+        playSound('incorrect');
+        gameState.lives--;
+        updateLivesUI();
+        showToast("ผิดนิดเดียว ลองคิดดูใหม่นะ 😢", false);
+        createParticles(fruit.x, fruit.y, '#ef4444');
+
+        if (gameState.lives <= 0) {
+          endGame();
+        } else {
+          // Stagger wrong fruit pop but continue same question until correct or timeout
+          setTimeout(() => {
+            // Respawn alternative wrong fruits or keep playing
+          }, 500);
+        }
+      }
+    }
+
+    // Create colorful splash particles
+    let particles = [];
+    function createParticles(x, y, color) {
+      for (let i = 0; i < 15; i++) {
+        particles.push({
+          x: x,
+          y: y,
+          vx: (Math.random() - 0.5) * 8,
+          vy: (Math.random() - 0.5) * 8,
+          radius: Math.random() * 5 + 3,
+          color: color,
+          alpha: 1,
+          decay: Math.random() * 0.03 + 0.02
+        });
+      }
+    }
+
+    // Update Hearts Display
+    function updateLivesUI() {
+      livesContainer.innerHTML = '';
+      for (let i = 0; i < 3; i++) {
+        if (i < gameState.lives) {
+          livesContainer.innerHTML += '<span class="text-pink-500 text-lg">❤️</span>';
+        } else {
+          livesContainer.innerHTML += '<span class="text-slate-300 text-lg">🤍</span>';
+        }
+      }
+    }
+
+    // Timer Loop Logic (10 seconds per question)
+    function startTimer() {
+      if (gameState.questionInterval) clearInterval(gameState.questionInterval);
+      
+      gameState.questionInterval = setInterval(() => {
+        if (!gameState.active) return;
+        
+        gameState.timeLeft -= 1.0; // Reduce percentage
+        
+        if (gameState.timeLeft <= 0) {
+          // Timeout
+          playSound('incorrect');
+          gameState.lives--;
+          updateLivesUI();
+          showToast("หมดเวลาซะแล้ว! ⏰", false);
+          
+          if (gameState.lives <= 0) {
+            endGame();
+          } else {
+            generateQuestion();
+          }
+        }
+
+        // Draw progress updates
+        progressTimer.style.width = `${gameState.timeLeft}%`;
+        if (gameState.timeLeft < 30) {
+          progressTimer.className = "bg-gradient-to-r from-red-500 to-rose-600 h-full w-full animate-pulse";
+        } else if (gameState.timeLeft < 60) {
+          progressTimer.className = "bg-gradient-to-r from-amber-400 to-orange-500 h-full w-full";
+        }
+      }, 150); // 15 seconds approximate
+    }
+
+    // --- GAME ENGINE LOOP ---
+    function gameLoop() {
+      if (!gameState.active) return;
+
+      // 1. Clear Canvas context
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+      // 2. Draw Video Frame (Mirrored for natural interaction)
+      if (gameState.useAR && videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+        ctx.save();
+        ctx.translate(canvasWidth, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(videoElement, 0, 0, canvasWidth, canvasHeight);
+        ctx.restore();
+      } else {
+        // Fallback beautiful purple board pattern when AR is Disabled
+        ctx.fillStyle = '#1e1b4b'; // Dark indigo
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+        // Grid lines effect
+        ctx.strokeStyle = 'rgba(99, 102, 241, 0.15)';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < canvasWidth; i += 40) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i, canvasHeight);
+          ctx.stroke();
+        }
+        for (let j = 0; j < canvasHeight; j += 40) {
+          ctx.beginPath();
+          ctx.moveTo(0, j);
+          ctx.lineTo(canvasWidth, j);
+          ctx.stroke();
+        }
+      }
+
+      // 3. Draw falling fruits
+      for (let i = 0; i < fruits.length; i++) {
+        const fruit = fruits[i];
+        if (fruit.popped) continue;
+
+        // Apply falling physics
+        fruit.y += fruit.speed;
+
+        // If falls below window, respawn at top with new positioning
+        if (fruit.y > canvasHeight + 50) {
+          fruit.y = -60;
+          fruit.x = Math.random() * (canvasWidth - 100) + 50;
+        }
+
+        // Render Fruit Body Card
+        ctx.save();
+        
+        // Drop shadow for element visibility
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 4;
+
+        // Bubble capsule container
+        ctx.beginPath();
+        ctx.arc(fruit.x, fruit.y, fruit.radius, 0, Math.PI * 2);
+        ctx.fillStyle = fruit.isCorrect ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.9)';
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = fruit.isCorrect ? '#34d399' : '#f43f5e'; // green border for correct, pink-red for incorrect
+        ctx.fill();
+        ctx.stroke();
+        ctx.shadowOffsetY = 0; // reset shadow
+        ctx.shadowBlur = 0;
+
+        // Hover progress target overlay circle
+        if (fruit.hoverDuration > 0) {
+          ctx.beginPath();
+          ctx.arc(fruit.x, fruit.y, fruit.radius + 4, -Math.PI / 2, (-Math.PI / 2) + (Math.PI * 2 * (fruit.hoverDuration / 35)));
+          ctx.strokeStyle = '#3b82f6'; // Bright blue hover ring
+          ctx.lineWidth = 5;
+          ctx.stroke();
+        }
+
+        // Draw Fruit Emoji inside bubble
+        ctx.font = `${fruit.size}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(fruit.emoji, fruit.x, fruit.y - 12);
+
+        // Draw mathematical value card tag
+        ctx.fillStyle = '#1e293b'; // dark text
+        ctx.font = 'bold 20px Mitr, Prompt, sans-serif';
+        ctx.fillText(fruit.value, fruit.x, fruit.y + 20);
+
+        ctx.restore();
+      }
+
+      // 4. Update and Draw Particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.alpha -= p.decay;
+
+        if (p.alpha <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // 5. Draw Hand landmarks/Pointer & Process Intersections
+      if (gameState.useAR && handDetected && indexFingerPos.x !== null) {
+        // Draw elegant circular glowing targeting reticle at index finger pointer position
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(indexFingerPos.x, indexFingerPos.y, 16, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(59, 130, 246, 0.3)'; // blue transparent glow
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#60a5fa'; // outer blue line
+        ctx.fill();
+        ctx.stroke();
+
+        // Draw inner dot
+        ctx.beginPath();
+        ctx.arc(indexFingerPos.x, indexFingerPos.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+
+        // Trigger continuous tracking calculations
+        checkCollision(indexFingerPos.x, indexFingerPos.y, false);
+        ctx.restore();
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // --- SETUP HAND DETECTION (Mediapipe) ---
+    let cameraInstance = null;
+    let handsInstance = null;
+
+    function initHandTracking() {
+      if (handsInstance) return Promise.resolve();
+
+      return new Promise((resolve, reject) => {
+        handsInstance = new Hands({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        handsInstance.setOptions({
+          maxNumHands: 1,
+          modelComplexity: 1,
+          minDetectionConfidence: 0.6,
+          minTrackingConfidence: 0.6
+        });
+
+        handsInstance.onResults(onHandResults);
+
+        cameraInstance = new Camera(videoElement, {
+          onFrame: async () => {
+            if (gameState.active && gameState.useAR) {
+              await handsInstance.send({ image: videoElement });
+            }
+          },
+          width: 640,
+          height: 480
+        });
+
+        cameraInstance.start()
+          .then(() => {
+            gameState.isLoaded = true;
+            resolve();
+          })
+          .catch(err => {
+            console.error("Camera access failed", err);
+            reject(err);
+          });
+      });
+    }
+
+    // MediaPipe Result Callback
+    function onHandResults(results) {
+      if (!gameState.active || !gameState.useAR) return;
+
+      // Check if hands detected
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        handDetected = true;
+        trackingStatusLabel.textContent = "ตรวจพบมือแล้ว! 👉 ชี้เพื่อเล่นได้เลย";
+        trackingStatusLabel.className = "text-emerald-400 font-bold animate-pulse";
+
+        const landmarks = results.multiHandLandmarks[0];
+        
+        // MediaPipe Index Finger Tip landmark index is 8
+        const indexFingerTip = landmarks[8];
+
+        // Map normalized coordinates (0.0 to 1.0) to Canvas Dimensions
+        // We mirror X coordinate coordinate mapping (1 - indexFingerTip.x) because camera feed is displayed flipped!
+        indexFingerPos.x = (1 - indexFingerTip.x) * canvasWidth;
+        indexFingerPos.y = indexFingerTip.y * canvasHeight;
+
+        // Render skeleton landmarks inside canvas for child feedback (Hand Track Vis)
+        drawSkeleton(landmarks);
+
+      } else {
+        handDetected = false;
+        indexFingerPos = { x: null, y: null };
+        trackingStatusLabel.textContent = "ไม่พบมือในกล้อง... กรุณายื่นมือมา";
+        trackingStatusLabel.className = "text-amber-400";
+      }
+    }
+
+    // Helper to draw skeleton tracking nodes
+    function drawSkeleton(landmarks) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.6)'; // emerald green tracking lines
+      ctx.lineWidth = 4;
+      
+      // Draw connecting wrist to fingers lines
+      const connections = [
+        [0, 1], [1, 2], [2, 3], [3, 4], // thumb
+        [0, 5], [5, 6], [6, 7], [7, 8], // index
+        [0, 9], [9, 10], [10, 11], [11, 12], // middle
+        [0, 13], [13, 14], [14, 15], [15, 16], // ring
+        [0, 17], [17, 18], [18, 19], [19, 20] // pinky
+      ];
+
+      for (let conn of connections) {
+        const pt1 = landmarks[conn[0]];
+        const pt2 = landmarks[conn[1]];
+        
+        ctx.beginPath();
+        ctx.moveTo((1 - pt1.x) * canvasWidth, pt1.y * canvasHeight);
+        ctx.lineTo((1 - pt2.x) * canvasWidth, pt2.y * canvasHeight);
+        ctx.stroke();
+      }
+
+      // Draw shiny dots at all joints
+      for (let i = 0; i < landmarks.length; i++) {
+        const pt = landmarks[i];
+        ctx.beginPath();
+        ctx.arc((1 - pt.x) * canvasWidth, pt.y * canvasHeight, 6, 0, Math.PI * 2);
+        
+        if (i === 8) {
+          ctx.fillStyle = '#ff007f'; // Highlight index finger tip with pink color
+        } else {
+          ctx.fillStyle = '#10b981'; // Green joint nodes
+        }
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // --- GAME CONTROLLER OPERATIONS ---
+
+    // Trigger Start Game sequence
+    async function startGame(enableAR) {
+      initAudio();
+      gameState.useAR = enableAR;
+      loadingOverlay.classList.remove('hidden');
+
+      if (enableAR) {
+        try {
+          // Trigger Hand tracking camera pipeline configuration
+          await initHandTracking();
+          arStatusDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse";
+          arStatusText.textContent = "โหมดกล้อง AR ทำงาน";
+          mouseControlHint.classList.add('hidden');
+        } catch (err) {
+          alert("ไม่สามารถจำลองกล้องเว็บแคมได้ หรือคุณได้ปฏิเสธสิทธิ์การเข้าถึง ขอเปลี่ยนระบบเป็นโหมดสัมผัสธรรมดาแทน!");
+          gameState.useAR = false;
+          arStatusDot.className = "w-2.5 h-2.5 rounded-full bg-slate-400";
+          arStatusText.textContent = "โหมดสัมผัสหน้าจอ";
+          mouseControlHint.classList.remove('hidden');
+        }
+      } else {
+        arStatusDot.className = "w-2.5 h-2.5 rounded-full bg-slate-400";
+        arStatusText.textContent = "โหมดสัมผัสหน้าจอ";
+        mouseControlHint.classList.remove('hidden');
+      }
+
+      // Complete initialization
+      loadingOverlay.classList.add('hidden');
+      startScreen.classList.add('hidden');
+      gameOverScreen.classList.add('hidden');
+
+      // Initialize game statistics
+      gameState.score = 0;
+      gameState.lives = 3;
+      gameState.correctAnswersCount = 0;
+      gameState.active = true;
+      scoreText.textContent = '0';
+      updateLivesUI();
+
+      // Setup dynamic sizing based on current container size
+      resizeCanvas();
+      
+      // Spawn questions
+      generateQuestion();
+      startTimer();
+      
+      // Start Engine Render Loop
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Dynamic Canvas Scaling
+    function resizeCanvas() {
+      const container = canvasElement.parentElement;
+      canvasWidth = container.clientWidth;
+      canvasHeight = container.clientHeight;
+      canvasElement.width = canvasWidth;
+      canvasElement.height = canvasHeight;
+    }
+
+    // Click/Touch fallback interaction handler
+    canvasElement.addEventListener('pointerdown', (e) => {
+      if (!gameState.active) return;
+      
+      // Get precise local offset values inside canvas container
+      const rect = canvasElement.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      // Scale coordinates back to matches internal drawing bounds
+      const scaledX = (clickX / rect.width) * canvasWidth;
+      const scaledY = (clickY / rect.height) * canvasHeight;
+
+      // Check immediate user click on target fruits
+      checkCollision(scaledX, scaledY, true);
+    });
+
+    // Terminate current game process
+    function endGame() {
+      gameState.active = false;
+      if (gameState.questionInterval) clearInterval(gameState.questionInterval);
+      playSound('gameover');
+
+      // Write Highscore configuration
+      if (gameState.score > gameState.highScore) {
+        gameState.highScore = gameState.score;
+        localStorage.setItem('math_ar_highscore', gameState.highScore.toString());
+      }
+
+      // Set score texts inside modal card
+      document.getElementById('final-score').textContent = gameState.score;
+      document.getElementById('final-correct').textContent = `${gameState.correctAnswersCount} ข้อ`;
+      document.getElementById('high-score-display').textContent = gameState.highScore;
+
+      // Show overlay
+      gameOverScreen.classList.remove('hidden');
+    }
+
+    // Reset gameplay configs
+    function restartGame() {
+      gameOverScreen.classList.add('hidden');
+      startGame(gameState.useAR);
+    }
+
+    // Return back to start
+    function showStartScreen() {
+      gameOverScreen.classList.add('hidden');
+      startScreen.classList.remove('hidden');
+    }
+
+    function exitToMainMenu() {
+      gameState.active = false;
+      if (gameState.questionInterval) clearInterval(gameState.questionInterval);
+      showStartScreen();
+    }
+
+    // Window responsive adjustments
+    window.addEventListener('resize', () => {
+      if (gameState.active) {
+        resizeCanvas();
+      }
+    });
+
+    // Default configuration: Mix Mode
+    selectMode('mixed');
+  </script>
+</body>
+</html>
+
+
+### คำอธิบายการทำงานและประสิทธิภาพทางเทคนิค:
+1. **การรวมไฟล์เป็นหนึ่งเดียว (Single File Strategy):** ทุกองค์ประกอบของตัวเกม ตั้งแต่โครงสร้างหน้าเว็บ (HTML), สไตล์ความน่ารัก (Tailwind CSS), ตัวประมวลผลกล้องและการตรวจจับมือ (MediaPipe API) ไปจนถึงลอจิกการคำนวณถูกรวบรวมไว้อย่างครบถ้วนพร้อมรันได้ทันที
+2. **การวาดกราฟิกและกล้องเว็บแคม:** ตัวเกมจะใช้เทคนิค Canvas วาดวิดีโอแบบกระจกสะท้อน (Mirrored Webcam) ให้ผู้เล่นรู้สึกธรรมชาติในการขยับมือ พร้อมวาดการเชื่อมต่อกระดูกข้อนิ้วมือและปลายนิ้วชี้ (Index Finger Tip - Landmark 8) ด้วยสีสันสดใสชวนให้ติดตาม
+3. **การชนกันและการตรวจจับตำแหน่ง (Collision Detection):** นำพิกัด X, Y ของปลายนิ้วชี้มาคำนวณระยะห่าง (Distance Formula) กับศูนย์กลางของผลไม้ เมื่อชี้ค้างไว้จนขอบเกจวงกลมวิ่งเต็มผลไม้ก็จะระเบิดเป็นพาร์ติเคิลสีสันสดใส และเช็คทันทีว่าคำตอบถูกหรือผิด
+4. **โหมดป้องกันการผิดพลาด (Fallback Mode):** หากผู้ใช้ไม่อนุญาตเข้าใช้กล้อง หรือเครื่องไม่มีเว็บแคม ตัวเกมจะสลับเป็นโหมดใช้เมาส์/ทัชสกรีน และซ่อนคำใบ้ต่าง ๆ อัตโนมัติ เพื่อให้ผู้เล่นทุกคนไม่มีปัญหาการเข้าใช้งานตัวระบบ
+
+ผู้เล่นสามารถคลิกปุ่ม **Preview** เพื่อทดสอบเล่นเกม และเพลิดเพลินกับการแก้โจทย์คณิตศาสตร์ ป.3 ไปพร้อมกับการตรวจจับมือ AR ได้ทันทีครับ!
